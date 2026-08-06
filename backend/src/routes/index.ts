@@ -4,6 +4,8 @@ import adminRoute from "./admin.route";
 import artistRoute from "./artist.route";
 import eventRoute from "./event.route";
 import ticketRoute from "./ticket.route";
+import ticketCategoryRoutes from "./ticket-category.route";
+import orderRoute from "./order.route";
 
 const router = Router();
 
@@ -12,5 +14,7 @@ router.use("/admin", adminRoute);
 router.use("/artists", artistRoute);
 router.use("/events", eventRoute);
 router.use("/tickets",ticketRoute);
+router.use("/ticket-categories", ticketCategoryRoutes);
+router.use("/orders",orderRoute);
 
 export default router;

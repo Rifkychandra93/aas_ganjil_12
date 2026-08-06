@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { dashboard } from "@/controllers/admin.controller";
 import { authMiddleware } from "@/middlewares/auth.middleware";
 import { roleMiddleware } from "@/middlewares/role.middleware";
 
@@ -8,14 +9,7 @@ router.get(
   "/dashboard",
   authMiddleware,
   roleMiddleware("ADMIN"),
-  (req, res) => {
-
-    res.json({
-      success: true,
-      message: "Welcome Admin"
-    });
-
-  }
+  dashboard
 );
 
 export default router;

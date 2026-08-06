@@ -20,11 +20,12 @@ enum EventStatus {
 enum OrderStatus {
   PENDING
   PAID
-  REJECTED
+  USED
+  CANCELLED
 }
 
 enum PaymentMethod {
-  TRANSFER
+  QRIS
   EWALLET
 }
 
@@ -104,9 +105,11 @@ model Order {
 
   status OrderStatus @default(PENDING)
 
-  paymentProof String?
-
   qrCode String?
+
+  paidAt DateTime?
+
+  usedAt DateTime?
 
   user User @relation(fields: [userId], references: [id])
 
