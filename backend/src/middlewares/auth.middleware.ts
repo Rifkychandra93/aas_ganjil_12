@@ -1,15 +1,11 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import { Role } from "@prisma/client";
 
-export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    role: string;
-  };
-}
+export type AuthRequest = Request;
 
 export const authMiddleware = (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
@@ -27,15 +23,17 @@ export const authMiddleware = (
   try {
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET as string
+      process.env.JWT_SECRET || "super_secret_jwt_key_ticket_system_2026"
     ) as {
       id: string;
-      role: string;
+      role: Role;
+      email?: string;
     };
 
     req.user = {
       id: decoded.id,
       role: decoded.role,
+      email: decoded.email,
     };
 
     next();

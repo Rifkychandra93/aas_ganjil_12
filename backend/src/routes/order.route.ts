@@ -10,29 +10,15 @@ import { roleMiddleware } from "@/middlewares/role.middleware";
 
 const router = Router();
 
-router.post(
-  "/",
-  authMiddleware,
-  createOrder
-);
-
-router.get(
-  "/me",
-  authMiddleware,
-  getMyOrders
-);
-
+router.post("/", authMiddleware, createOrder);
+router.get("/me", authMiddleware, getMyOrders);
+router.get("/my", authMiddleware, getMyOrders);
 router.post(
   "/scan",
   authMiddleware,
-  roleMiddleware("ADMIN"),
+  roleMiddleware("GUARD", "ADMIN", "SUPERADMIN"),
   scanTicket
 );
-
-router.get(
-  "/:id",
-  authMiddleware,
-  getOrderById
-);
+router.get("/:id", authMiddleware, getOrderById);
 
 export default router;

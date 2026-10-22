@@ -1,18 +1,17 @@
 import prisma from "@/config/prisma";
-import { OrderInput, orderSchema } from "@/validations/order.validation";
 import { generateTicketCode } from "@/utils/generate-ticket-code";
-import { generateQRCode } from "@/utils/generate-qrcode";
-import { TicketCategory } from "@prisma/client";
+import { generateQRCodeDataUrl, generateBarcode128Svg } from "@/utils/generate-barcode";
+import { createMidtransSnapTransaction } from "./midtrans.service";
+import { sendTicketReceiptMail } from "./mail.service";
+import { createSystemLog } from "./log.service";
+import { PaymentMethod } from "@prisma/client";
 
 export const createOrderService = async (
   userId: string,
-  payload: OrderInput
+  payload: any
 ) => {
-
   const user = await prisma.user.findUnique({
-    where: {
-      id: userId,
-    },
+    where: { id: userId },
   });
 
   if (!user) {
@@ -23,32 +22,39 @@ export const createOrderService = async (
     };
   }
 
-  const validation = orderSchema.safeParse(payload);
+  let itemsPayload: { ticketCategoryId: string; quantity: number }[] = [];
 
-  if (!validation.success) {
+  if (payload.categoryId && payload.quantity) {
+    itemsPayload = [
+      {
+        ticketCategoryId: String(payload.categoryId),
+        quantity: Number(payload.quantity),
+      },
+    ];
+  } else if (Array.isArray(payload.items) && payload.items.length > 0) {
+    itemsPayload = payload.items.map((i: any) => ({
+      ticketCategoryId: String(i.ticketCategoryId),
+      quantity: Number(i.quantity),
+    }));
+  } else {
     return {
       statusCode: 400,
       success: false,
-      message: validation.error.issues[0].message,
+      message: "Data pemesanan tiket tidak valid",
     };
   }
 
-  const { paymentMethod, items } = validation.data;
-
   let totalPrice = 0;
-
   const ticketData: {
-    ticket: TicketCategory;
+    ticket: any;
     quantity: number;
     subtotal: number;
   }[] = [];
 
-  for (const item of items) {
-
+  for (const item of itemsPayload) {
     const ticket = await prisma.ticketCategory.findUnique({
-      where: {
-        id: item.ticketCategoryId,
-      },
+      where: { id: item.ticketCategoryId },
+      include: { event: true },
     });
 
     if (!ticket) {
@@ -63,37 +69,61 @@ export const createOrderService = async (
       return {
         statusCode: 400,
         success: false,
-        message: `${ticket.name} tidak mencukupi`,
+        message: `Sisa tiket ${ticket.name} tidak mencukupi`,
       };
     }
 
     const subtotal = ticket.price * item.quantity;
-
     totalPrice += subtotal;
-
     ticketData.push({
       ticket,
       quantity: item.quantity,
       subtotal,
     });
-
   }
 
   const ticketCode = generateTicketCode();
+  const qrCodeDataUrl = await generateQRCodeDataUrl(ticketCode);
+  const barcodeSvgDataUrl = generateBarcode128Svg(ticketCode);
+
+  const midtransItems = ticketData.map((td) => ({
+    id: td.ticket.id,
+    price: td.ticket.price,
+    quantity: td.quantity,
+    name: `${td.ticket.event?.title || "Event"} - ${td.ticket.name}`,
+  }));
+
+  const midtransResult = await createMidtransSnapTransaction({
+    orderId: ticketCode,
+    grossAmount: totalPrice,
+    customerDetails: {
+      firstName: user.name,
+      email: user.email,
+    },
+    items: midtransItems,
+  });
+
+  const paymentMethodEnum: PaymentMethod =
+    payload.paymentMethod && Object.values(PaymentMethod).includes(payload.paymentMethod)
+      ? payload.paymentMethod
+      : PaymentMethod.MIDTRANS;
 
   const order = await prisma.$transaction(async (tx) => {
-
     const createdOrder = await tx.order.create({
       data: {
         userId,
         ticketCode,
-        paymentMethod,
+        paymentMethod: paymentMethodEnum,
         totalPrice,
+        status: "PAID",
+        paidAt: new Date(),
+        qrCode: qrCodeDataUrl,
+        barcode: barcodeSvgDataUrl,
+        snapToken: midtransResult.snapToken,
       },
     });
 
     for (const item of ticketData) {
-
       await tx.orderItem.create({
         data: {
           orderId: createdOrder.id,
@@ -105,68 +135,73 @@ export const createOrderService = async (
       });
 
       await tx.ticketCategory.update({
-        where: {
-          id: item.ticket.id,
-        },
+        where: { id: item.ticket.id },
         data: {
           remainingQuota: {
             decrement: item.quantity,
           },
         },
       });
-
     }
 
     return createdOrder;
+  });
 
+  const eventTitle = ticketData[0]?.ticket?.event?.title || "Konser Musik";
+  await sendTicketReceiptMail(
+    user.email,
+    user.name,
+    eventTitle,
+    ticketCode,
+    qrCodeDataUrl
+  );
+
+  await createSystemLog({
+    userId: user.id,
+    userEmail: user.email,
+    role: user.role,
+    action: `Pemesanan Tiket: ${eventTitle} (${ticketCode})`,
+    details: `Total: Rp ${totalPrice.toLocaleString("id-ID")}`,
   });
 
   const result = await prisma.order.findUnique({
-  where: {
-    id: order.id,
-  },
-  include: {
-    items: {
-      include: {
-        ticketCategory: true,
-      },
-    },
-  },
-});
-
-return {
-  statusCode: 201,
-  success: true,
-  message: "Order berhasil dibuat",
-  data: result,
-};
-
-};
-
-export const getMyOrdersService = async (
-  userId: string
-) => {
-
-  const orders = await prisma.order.findMany({
-    where: {
-      userId,
-    },
+    where: { id: order.id },
     include: {
       items: {
         include: {
           ticketCategory: {
             include: {
-              event: {
-                include: {
-                  artist: {
-                    select: {
-                      id: true,
-                      name: true,
-                      photo: true,
-                    },
-                  },
-                },
-              },
+              event: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return {
+    statusCode: 201,
+    success: true,
+    message: "Order berhasil dibuat",
+    snapToken: midtransResult.snapToken,
+    redirectUrl: midtransResult.redirectUrl,
+    data: {
+      ...result,
+      snapToken: midtransResult.snapToken,
+      redirectUrl: midtransResult.redirectUrl,
+    },
+  };
+};
+
+export const getMyOrdersService = async (userId: string) => {
+  const orders = await prisma.order.findMany({
+    where: { userId },
+    include: {
+      items: {
+        include: {
+          ticketCategory: {
+            include: {
+              event: true,
             },
           },
         },
@@ -177,53 +212,137 @@ export const getMyOrdersService = async (
     },
   });
 
+  const formattedTickets = orders.map((order) => {
+    const firstItem = order.items[0];
+    const event = firstItem?.ticketCategory?.event;
+    const category = firstItem?.ticketCategory;
+
+    return {
+      id: order.id,
+      orderId: order.id,
+      ticketCode: order.ticketCode,
+      eventTitle: event?.title || "Konser Musik",
+      categoryName: category?.name || "Standard",
+      qrCode: order.qrCode || "",
+      barcode: order.barcode || "",
+      isUsed: !!order.usedAt,
+      status: order.status,
+      totalPrice: order.totalPrice,
+      createdAt: order.createdAt,
+    };
+  });
+
   return {
     statusCode: 200,
     success: true,
-    data: orders,
+    data: formattedTickets,
   };
 };
 
-export const cancelOrderService = async (
-  userId: string,
-  orderId: string
+export const scanTicketService = async (
+  payload: any,
+  actor?: { id: string; email: string; role: string }
 ) => {
-  const order = await prisma.order.findUnique({
+  const searchCode = payload.qrCode || payload.ticketCode;
+
+  if (!searchCode) {
+    return {
+      statusCode: 400,
+      success: false,
+      message: "Kode QR / Barcode tiket wajib diisi",
+    };
+  }
+
+  const order = await prisma.order.findFirst({
     where: {
-      id: orderId,
+      OR: [
+        { ticketCode: searchCode },
+        { id: searchCode },
+      ],
+    },
+    include: {
+      user: true,
+      items: {
+        include: {
+          ticketCategory: {
+            include: {
+              event: true,
+            },
+          },
+        },
+      },
     },
   });
 
   if (!order) {
+    if (actor) {
+      await createSystemLog({
+        userId: actor.id,
+        userEmail: actor.email,
+        role: actor.role,
+        action: `Scan Tiket #${searchCode} (Tidak Ditemukan)`,
+      });
+    }
     return {
       statusCode: 404,
       success: false,
-      message: "Order tidak ditemukan",
+      message: "Tiket Tidak Valid / Tidak Ditemukan!",
     };
   }
 
-  if (order.userId !== userId) {
+  if (order.usedAt) {
+    if (actor) {
+      await createSystemLog({
+        userId: actor.id,
+        userEmail: actor.email,
+        role: actor.role,
+        action: `Scan Tiket #${order.ticketCode} (Sudah Digunakan)`,
+      });
+    }
     return {
-      statusCode: 403,
+      statusCode: 400,
       success: false,
-      message: "Anda tidak memiliki akses untuk membatalkan order ini",
+      message: "Tiket Sudah Digunakan!",
     };
   }
 
-  const updated = await prisma.order.update({
-    where: {
-      id: orderId,
-    },
+  if (order.status !== "PAID") {
+    return {
+      statusCode: 400,
+      success: false,
+      message: "Status pembayaran tiket belum selesai",
+    };
+  }
+
+  await prisma.order.update({
+    where: { id: order.id },
     data: {
-      status: "CANCELLED",
+      usedAt: new Date(),
+      status: "USED",
     },
   });
+
+  if (actor) {
+    await createSystemLog({
+      userId: actor.id,
+      userEmail: actor.email,
+      role: actor.role,
+      action: `Scan Tiket #${order.ticketCode} (Valid)`,
+      details: `Customer: ${order.user.name}, Event: ${order.items[0]?.ticketCategory?.event?.title || "-"}`,
+    });
+  }
 
   return {
     statusCode: 200,
     success: true,
-    message: "Order berhasil dibatalkan",
-    data: updated,
+    message: "Tiket Valid! Silakan Masuk.",
+    data: {
+      ticketCode: order.ticketCode,
+      customer: order.user.name,
+      event: order.items[0]?.ticketCategory?.event?.title || "Konser Musik",
+      category: order.items[0]?.ticketCategory?.name || "Reguler",
+      usedAt: new Date(),
+    },
   };
 };
 
@@ -231,7 +350,6 @@ export const getOrderByIdService = async (
   userId: string,
   orderId: string
 ) => {
-
   const order = await prisma.order.findFirst({
     where: {
       id: orderId,
@@ -266,86 +384,5 @@ export const getOrderByIdService = async (
     statusCode: 200,
     success: true,
     data: order,
-  };
-};
-
-import { scanSchema, ScanInput } from "@/validations/scan.validation";
-
-export const scanTicketService = async (
-  payload: ScanInput
-) => {
-
-  const validation = scanSchema.safeParse(payload);
-
-  if (!validation.success) {
-    return {
-      statusCode: 400,
-      success: false,
-      message: validation.error.issues[0].message,
-    };
-  }
-
-  const { ticketCode } = validation.data;
-
-  const order = await prisma.order.findUnique({
-    where: {
-      ticketCode,
-    },
-    include: {
-      user: true,
-      items: {
-        include: {
-          ticketCategory: {
-            include: {
-              event: true,
-            },
-          },
-        },
-      },
-    },
-  });
-
-  if (!order) {
-    return {
-      statusCode: 404,
-      success: false,
-      message: "Tiket tidak ditemukan",
-    };
-  }
-
-  if (order.status !== "PAID") {
-    return {
-      statusCode: 400,
-      success: false,
-      message: "Pembayaran belum disetujui",
-    };
-  }
-
-  if (order.usedAt) {
-    return {
-      statusCode: 400,
-      success: false,
-      message: "Tiket sudah digunakan",
-    };
-  }
-
-  await prisma.order.update({
-    where: {
-      id: order.id,
-    },
-    data: {
-      usedAt: new Date(),
-    },
-  });
-
-  return {
-    statusCode: 200,
-    success: true,
-    message: "Tiket valid",
-    data: {
-      ticketCode: order.ticketCode,
-      customer: order.user.name,
-      event: order.items[0]?.ticketCategory.event.title,
-    },
   };
 };
