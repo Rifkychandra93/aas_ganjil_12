@@ -1,5 +1,5 @@
-import RegiterContent from "../../components/auth/RegisterContent";
+import RegisterContent from "../../components/auth/RegisterContent";
 
 export default function Register() {
-  return <RegiterContent />
+  return <RegisterContent />
 }

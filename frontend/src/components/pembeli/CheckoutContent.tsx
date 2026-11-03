@@ -65,12 +65,17 @@ export default function CheckoutContent() {
 
   if (!categoryId || !quantity) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-md w-full text-center">
-          <p className="text-gray-600 mb-4 font-medium">Tidak ada tiket yang dipilih untuk checkout.</p>
+      <div className="min-h-screen flex items-center justify-center bg-white p-4">
+        <div className="bg-white p-10 rounded-3xl shadow-xl border border-gray-100 max-w-md w-full text-center">
+          <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <p className="text-gray-800 mb-6 font-bold text-lg">Tidak ada tiket yang dipilih untuk checkout.</p>
           <button
             onClick={() => navigate('/dashboard')}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm"
+            className="bg-[#7956DF] hover:bg-[#6845c5] text-white font-bold px-8 py-3 rounded-xl w-full transition-colors"
           >
             Pilih Konser
           </button>
@@ -82,53 +87,53 @@ export default function CheckoutContent() {
   const totalPrice = (price || 0) * (quantity || 1)
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 w-full max-w-lg">
-        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
-          <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4 sm:p-8 animate-fade-slide-up">
+      <div className="bg-white p-8 sm:p-10 rounded-3xl shadow-xl border border-gray-100 w-full max-w-lg">
+        <div className="flex items-center gap-4 mb-8 pb-6 border-b border-gray-100">
+          <div className="w-14 h-14 rounded-2xl bg-[#7956DF]/10 text-[#7956DF] flex items-center justify-center">
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Konfirmasi Pembayaran</h1>
-            <p className="text-xs text-gray-500">Gateway pembayaran resmi via Midtrans</p>
+            <h1 className="text-2xl font-black text-gray-900">Konfirmasi Pembayaran</h1>
+            <p className="text-sm text-gray-500 font-medium">Gateway pembayaran resmi via Midtrans</p>
           </div>
         </div>
 
         {errorMessage && (
-          <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-xl text-sm mb-4">
+          <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-xl text-sm mb-6">
             {errorMessage}
           </div>
         )}
 
-        <div className="bg-gray-50 rounded-xl p-5 mb-6 space-y-3">
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Event</span>
-            <span className="font-semibold text-gray-900">{eventTitle || 'Konser Musik'}</span>
+        <div className="bg-gray-50 rounded-2xl p-6 mb-8 border border-gray-100 space-y-4">
+          <div className="flex justify-between items-start text-sm">
+            <span className="text-gray-500 font-medium">Event</span>
+            <span className="font-bold text-gray-900 text-right">{eventTitle || 'Konser Musik'}</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Kategori Tiket</span>
-            <span className="font-semibold text-gray-900">{categoryName || 'Tiket Masuk'}</span>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-gray-500 font-medium">Kategori Tiket</span>
+            <span className="font-bold text-[#7956DF] bg-[#7956DF]/10 px-3 py-1 rounded-lg">{categoryName || 'Tiket Masuk'}</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Jumlah</span>
-            <span className="font-semibold text-gray-900">{quantity} tiket</span>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-gray-500 font-medium">Jumlah</span>
+            <span className="font-bold text-gray-900">{quantity} tiket</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Harga Satuan</span>
-            <span className="font-semibold text-gray-900">Rp {(price || 0).toLocaleString('id-ID')}</span>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-gray-500 font-medium">Harga Satuan</span>
+            <span className="font-bold text-gray-900">Rp {(price || 0).toLocaleString('id-ID')}</span>
           </div>
-          <div className="border-t border-gray-200 pt-3 flex justify-between items-center">
-            <span className="font-bold text-gray-900">Total Pembayaran</span>
-            <span className="text-xl font-black text-blue-600">Rp {totalPrice.toLocaleString('id-ID')}</span>
+          <div className="border-t border-gray-200 pt-4 flex justify-between items-center mt-2">
+            <span className="font-bold text-gray-900 text-lg">Total Pembayaran</span>
+            <span className="text-2xl font-black text-[#7956DF]">Rp {totalPrice.toLocaleString('id-ID')}</span>
           </div>
         </div>
 
         <button
           onClick={handlePay}
           disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white p-3.5 rounded-xl font-bold transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+          className="w-full bg-[#7956DF] hover:bg-[#6845c5] text-white p-4 rounded-2xl font-bold text-lg transition-all transform hover:-translate-y-1 shadow-lg shadow-purple-200 disabled:opacity-50 disabled:hover:translate-y-0 flex items-center justify-center gap-3"
         >
           {loading ? (
             <>
@@ -136,11 +141,13 @@ export default function CheckoutContent() {
               Menghubungkan Midtrans...
             </>
           ) : (
-            'Bayar Sekarang dengan Midtrans'
+            <>
+              Bayar Sekarang
+            </>
           )}
         </button>
 
-        <p className="text-center text-xs text-gray-400 mt-4">
+        <p className="text-center text-xs text-gray-400 mt-6 font-medium">
           Transaksi aman terlindungi oleh Midtrans Snap Payment Gateway
         </p>
       </div>
