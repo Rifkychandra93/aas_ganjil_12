@@ -101,6 +101,13 @@ export const dashboardService = async () => {
     };
   });
 
+  const dayNames = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
+  const weeklyStats = dayNames.map((day) => ({
+    day,
+    revenue: 0,
+    tickets: 0,
+  }));
+
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
   const monthlyStats = monthNames.map((month) => ({
     month,
@@ -109,10 +116,15 @@ export const dashboardService = async () => {
   }));
 
   yearlyOrders.forEach((order) => {
+    const dayIdx = (order.createdAt.getDay() + 6) % 7;
     const monthIdx = order.createdAt.getMonth();
     const qty = order.items.reduce((acc, curr) => acc + curr.quantity, 0);
+
+    weeklyStats[dayIdx].tickets += qty;
     monthlyStats[monthIdx].tickets += qty;
+
     if (order.status === "PAID") {
+      weeklyStats[dayIdx].revenue += order.totalPrice;
       monthlyStats[monthIdx].revenue += order.totalPrice;
     }
   });
@@ -142,6 +154,7 @@ export const dashboardService = async () => {
     totalOrders,
     pendingOrders,
     paidOrders,
+    weeklyStats,
     monthlyStats,
     categoryDistribution,
   };

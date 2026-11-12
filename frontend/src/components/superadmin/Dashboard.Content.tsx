@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../../utils/api'
 
-interface MonthlyData {
-  month: string
+interface DayData {
+  day: string
   revenue: number
   tickets: number
 }
@@ -24,7 +24,7 @@ interface DashboardStats {
   totalOrders: number
   pendingOrders: number
   paidOrders: number
-  monthlyStats?: MonthlyData[]
+  weeklyStats?: DayData[]
   categoryDistribution?: CategoryDist[]
 }
 
@@ -39,7 +39,7 @@ interface RecentTransaction {
   createdAt: string
 }
 
-const DEFAULT_MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+const DEFAULT_DAY_NAMES = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
 
 export default function DashboardContent() {
   const [stats, setStats] = useState<DashboardStats>({
@@ -51,7 +51,7 @@ export default function DashboardContent() {
     totalOrders: 0,
     pendingOrders: 0,
     paidOrders: 0,
-    monthlyStats: DEFAULT_MONTH_NAMES.map((m) => ({ month: m, revenue: 0, tickets: 0 })),
+    weeklyStats: DEFAULT_DAY_NAMES.map((d) => ({ day: d, revenue: 0, tickets: 0 })),
     categoryDistribution: [],
   })
   const [transactions, setTransactions] = useState<RecentTransaction[]>([])
@@ -105,10 +105,10 @@ export default function DashboardContent() {
         }
 
         setStats((prev) => {
-          const updatedMonthly =
-            fetchedStats.monthlyStats && fetchedStats.monthlyStats.length === 12
-              ? fetchedStats.monthlyStats
-              : prev.monthlyStats || DEFAULT_MONTH_NAMES.map((m) => ({ month: m, revenue: 0, tickets: 0 }))
+          const updatedWeekly =
+            fetchedStats.weeklyStats && fetchedStats.weeklyStats.length === 7
+              ? fetchedStats.weeklyStats
+              : prev.weeklyStats || DEFAULT_DAY_NAMES.map((d) => ({ day: d, revenue: 0, tickets: 0 }))
 
           return {
             ...prev,
@@ -121,7 +121,7 @@ export default function DashboardContent() {
             totalOrders: fetchedStats.totalOrders ?? 0,
             pendingOrders: fetchedStats.pendingOrders ?? 0,
             paidOrders: fetchedStats.paidOrders ?? 0,
-            monthlyStats: updatedMonthly,
+            weeklyStats: updatedWeekly,
             categoryDistribution: fetchedStats.categoryDistribution || [],
           }
         })
@@ -139,29 +139,29 @@ export default function DashboardContent() {
     return 'Rp ' + Number(val || 0).toLocaleString('id-ID')
   }
 
-  const monthlyList: MonthlyData[] =
-    stats.monthlyStats && stats.monthlyStats.length === 12
-      ? stats.monthlyStats
-      : DEFAULT_MONTH_NAMES.map((m) => ({ month: m, revenue: 0, tickets: 0 }))
+  const weeklyList: DayData[] =
+    stats.weeklyStats && stats.weeklyStats.length === 7
+      ? stats.weeklyStats
+      : DEFAULT_DAY_NAMES.map((d) => ({ day: d, revenue: 0, tickets: 0 }))
 
-  const metricValues = monthlyList.map((m) => (chartMetric === 'revenue' ? m.revenue : m.tickets))
+  const metricValues = weeklyList.map((m) => (chartMetric === 'revenue' ? m.revenue : m.tickets))
   const maxRaw = Math.max(...metricValues)
   const maxVal = maxRaw > 0 ? maxRaw : chartMetric === 'revenue' ? 1000000 : 10
 
-  const svgWidth = 760
+  const svgWidth = 680
   const svgHeight = 220
-  const padLeft = 60
-  const padRight = 30
+  const padLeft = 35
+  const padRight = 35
   const padTop = 25
   const padBottom = 35
   const plotWidth = svgWidth - padLeft - padRight
   const plotHeight = svgHeight - padTop - padBottom
 
-  const points = monthlyList.map((item, idx) => {
+  const points = weeklyList.map((item, idx) => {
     const val = chartMetric === 'revenue' ? item.revenue : item.tickets
-    const x = padLeft + (idx / (monthlyList.length - 1)) * plotWidth
+    const x = padLeft + (idx / (weeklyList.length - 1)) * plotWidth
     const y = padTop + plotHeight - (maxVal > 0 ? (val / maxVal) * plotHeight : 0)
-    return { x, y, val, month: item.month }
+    return { x, y, val, day: item.day }
   })
 
   const linePathD = points.reduce((acc, pt, idx) => {
@@ -172,20 +172,23 @@ export default function DashboardContent() {
     ? `${linePathD} L ${points[points.length - 1].x} ${padTop + plotHeight} L ${points[0].x} ${padTop + plotHeight} Z`
     : ''
 
-  const yAxisTicks = [
-    { label: chartMetric === 'revenue' ? formatRupiah(maxVal) : `${maxVal}`, y: padTop },
-    { label: chartMetric === 'revenue' ? formatRupiah(Math.round(maxVal * 0.5)) : `${Math.round(maxVal * 0.5)}`, y: padTop + plotHeight * 0.5 },
-    { label: '0', y: padTop + plotHeight },
-  ]
+  const gridLineY = [padTop, padTop + plotHeight * 0.33, padTop + plotHeight * 0.66, padTop + plotHeight]
 
   const activePoint = hoveredIndex !== null ? points[hoveredIndex] : null
+
+  const categoryColors = ['#7C3AED', '#9333EA', '#C084FC', '#A855F7', '#E9D5FF']
+  const donutRadius = 55
+  const donutCircumference = 2 * Math.PI * donutRadius
+  const totalCategorySold = (stats.categoryDistribution || []).reduce((acc, curr) => acc + curr.sold, 0)
+
+  let accumulatedPercent = 0
 
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-gray-900 tracking-tight">Dashboard Ringkasan & Grafik Garis</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Analisis data real-time penjualan tiket dan operasional platform</p>
+          <p className="text-sm text-gray-500 mt-0.5">Analisis data real-time penjualan tiket mingguan dan operasional platform</p>
         </div>
         <div className="flex items-center gap-3">
           <Link
@@ -267,8 +270,8 @@ export default function DashboardContent() {
         <div className="lg:col-span-2 bg-white rounded-2xl p-6 sm:p-7 border border-gray-100 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
             <div>
-              <h2 className="font-bold text-gray-900 text-lg">Grafik Garis Tren Penjualan Real-Time</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Grafik garis dinamis berdasarkan catatan transaksi sistem tahun 2026</p>
+              <h2 className="font-bold text-gray-900 text-lg">Tren Penjualan RealTime</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Grafik garis tren mingguan (Senin s/d Minggu)</p>
             </div>
             <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-xl border border-gray-100 self-start sm:self-auto">
               <button
@@ -308,28 +311,17 @@ export default function DashboardContent() {
                 </linearGradient>
               </defs>
 
-              {yAxisTicks.map((tick, i) => (
-                <g key={i}>
-                  <line
-                    x1={padLeft}
-                    y1={tick.y}
-                    x2={svgWidth - padRight}
-                    y2={tick.y}
-                    stroke="#F1F5F9"
-                    strokeWidth="1"
-                    strokeDasharray="4 4"
-                  />
-                  <text
-                    x={padLeft - 10}
-                    y={tick.y + 4}
-                    textAnchor="end"
-                    fill="#94A3B8"
-                    fontSize="10"
-                    fontWeight="600"
-                  >
-                    {tick.label}
-                  </text>
-                </g>
+              {gridLineY.map((yVal, i) => (
+                <line
+                  key={i}
+                  x1={padLeft}
+                  y1={yVal}
+                  x2={svgWidth - padRight}
+                  y2={yVal}
+                  stroke="#F1F5F9"
+                  strokeWidth="1"
+                  strokeDasharray="4 4"
+                />
               ))}
 
               {areaPathD && (
@@ -364,22 +356,22 @@ export default function DashboardContent() {
                 const isHovered = hoveredIndex === idx
                 return (
                   <g
-                    key={pt.month}
+                    key={pt.day}
                     onMouseEnter={() => setHoveredIndex(idx)}
                     onMouseLeave={() => setHoveredIndex(null)}
                     className="cursor-pointer"
                   >
                     <rect
-                      x={pt.x - 22}
+                      x={pt.x - 30}
                       y={padTop}
-                      width="44"
+                      width="60"
                       height={plotHeight + 25}
                       fill="transparent"
                     />
                     <circle
                       cx={pt.x}
                       cy={pt.y}
-                      r={isHovered ? '7' : '4.5'}
+                      r={isHovered ? '7.5' : '5'}
                       fill="#7C3AED"
                       stroke="#FFFFFF"
                       strokeWidth="2.5"
@@ -390,11 +382,11 @@ export default function DashboardContent() {
                       y={svgHeight - 12}
                       textAnchor="middle"
                       fill={isHovered ? '#7C3AED' : '#94A3B8'}
-                      fontSize="11"
+                      fontSize="12"
                       fontWeight={isHovered ? 'bold' : '600'}
                       className="pointer-events-none"
                     >
-                      {pt.month}
+                      {pt.day}
                     </text>
                   </g>
                 )
@@ -418,7 +410,7 @@ export default function DashboardContent() {
                     fontSize="10"
                     fontWeight="700"
                   >
-                    {activePoint.month} 2026
+                    {activePoint.day}
                   </text>
                   <text
                     x={Math.max(padLeft, Math.min(svgWidth - padRight - 140, activePoint.x - 70)) + 70}
@@ -439,37 +431,91 @@ export default function DashboardContent() {
         <div className="bg-white rounded-2xl p-6 sm:p-7 border border-gray-100 shadow-xs flex flex-col justify-between">
           <div>
             <h2 className="font-bold text-gray-900 text-lg">Distribusi Kategori Tiket</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Data riil kategori tiket dari database</p>
+            <p className="text-xs text-gray-400 mt-0.5">Persentase tiket terjual per kelas</p>
           </div>
 
-          <div className="my-6 space-y-4">
-            {stats.categoryDistribution && stats.categoryDistribution.length > 0 ? (
-              stats.categoryDistribution.map((cat, idx) => {
-                const colors = ['#7C3AED', '#9333EA', '#C084FC', '#A855F7', '#D8B4FE']
-                const col = colors[idx % colors.length]
-                return (
-                  <div key={cat.name}>
-                    <div className="flex justify-between text-xs font-bold mb-1.5">
-                      <span className="text-gray-700 flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: col }}></span>
-                        {cat.name}
-                      </span>
-                      <span className="text-gray-900">{cat.sold} / {cat.quota} ({cat.percentage}%)</span>
-                    </div>
-                    <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${Math.max(4, cat.percentage)}%`, backgroundColor: col }}
-                      ></div>
-                    </div>
-                  </div>
-                )
-              })
-            ) : (
-              <div className="py-8 text-center text-gray-400 text-xs">
-                Belum ada data distribusi tiket yang terjual
+          <div className="my-6 flex flex-col items-center">
+            <div className="relative w-44 h-44 flex items-center justify-center">
+              <svg viewBox="0 0 160 160" className="w-full h-full transform -rotate-90">
+                <circle
+                  cx="80"
+                  cy="80"
+                  r={donutRadius}
+                  stroke="#F3E8FF"
+                  strokeWidth="16"
+                  fill="none"
+                />
+                {stats.categoryDistribution && stats.categoryDistribution.length > 0 && totalCategorySold > 0 ? (
+                  stats.categoryDistribution.map((cat, idx) => {
+                    const strokeDash = (cat.percentage / 100) * donutCircumference
+                    const strokeOffset = -(accumulatedPercent / 100) * donutCircumference
+                    accumulatedPercent += cat.percentage
+                    const col = categoryColors[idx % categoryColors.length]
+
+                    return (
+                      <circle
+                        key={cat.name}
+                        cx="80"
+                        cy="80"
+                        r={donutRadius}
+                        stroke={col}
+                        strokeWidth="16"
+                        fill="none"
+                        strokeDasharray={`${strokeDash} ${donutCircumference}`}
+                        strokeDashoffset={strokeOffset}
+                        strokeLinecap="round"
+                        className="transition-all duration-500"
+                      />
+                    )
+                  })
+                ) : (
+                  <circle
+                    cx="80"
+                    cy="80"
+                    r={donutRadius}
+                    stroke="#7C3AED"
+                    strokeWidth="16"
+                    fill="none"
+                    strokeDasharray={`${donutCircumference * 0.15} ${donutCircumference}`}
+                    strokeDashoffset="0"
+                    strokeLinecap="round"
+                    className="opacity-40"
+                  />
+                )}
+              </svg>
+
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-2xl font-black text-gray-900 leading-none">
+                  {totalCategorySold > 0 ? totalCategorySold : stats.totalTicketsSold}
+                </span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">
+                  Tiket Terjual
+                </span>
               </div>
-            )}
+            </div>
+
+            <div className="w-full mt-6 space-y-2">
+              {stats.categoryDistribution && stats.categoryDistribution.length > 0 ? (
+                stats.categoryDistribution.map((cat, idx) => {
+                  const col = categoryColors[idx % categoryColors.length]
+                  return (
+                    <div key={cat.name} className="flex items-center justify-between text-xs font-semibold py-1 border-b border-gray-50 last:border-b-0">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: col }}></span>
+                        <span className="text-gray-800 line-clamp-1">{cat.name}</span>
+                      </div>
+                      <span className="text-gray-500 font-bold shrink-0">
+                        {cat.sold} ({cat.percentage}%)
+                      </span>
+                    </div>
+                  )
+                })
+              ) : (
+                <div className="text-center text-xs text-gray-400 py-2">
+                  Belum ada pembagian data tiket
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="p-4 bg-purple-50/60 rounded-xl border border-purple-100">

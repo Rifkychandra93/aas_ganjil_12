@@ -142,11 +142,11 @@ export default function LogsContent() {
           <table className="w-full text-left text-sm text-gray-600">
             <thead className="bg-[#F9FAFC] text-gray-500 uppercase text-xs border-b border-gray-100">
               <tr>
+                <th className="px-6 py-4 font-bold w-16">No</th>
                 <th className="px-6 py-4 font-bold">Waktu</th>
                 <th className="px-6 py-4 font-bold">Pengguna</th>
                 <th className="px-6 py-4 font-bold">Peran</th>
                 <th className="px-6 py-4 font-bold">Aktivitas</th>
-                <th className="px-6 py-4 font-bold">Detail Tambahan</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -166,8 +166,11 @@ export default function LogsContent() {
                   </td>
                 </tr>
               ) : (
-                paginatedLogs.map((log) => (
+                paginatedLogs.map((log, idx) => (
                   <tr key={log.id} className="hover:bg-purple-50/20 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-xs font-bold text-gray-400">
+                      {startIndex + idx + 1}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-xs font-mono text-gray-500">
                       {log.time}
                     </td>
@@ -186,9 +189,6 @@ export default function LogsContent() {
                     </td>
                     <td className="px-6 py-4 font-semibold text-gray-800">
                       {log.action}
-                    </td>
-                    <td className="px-6 py-4 text-xs text-gray-500 max-w-xs truncate">
-                      {log.details || '-'}
                     </td>
                   </tr>
                 ))
