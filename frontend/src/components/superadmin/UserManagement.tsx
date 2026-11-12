@@ -24,7 +24,8 @@ export default function UserManagementContent() {
     try {
       const res = await api.get('/users')
       const data = Array.isArray(res.data) ? res.data : (res.data?.data || [])
-      setUsers(data)
+      const staffOnly = data.filter((u: UserItem) => u.role?.toUpperCase() !== 'CUSTOMER')
+      setUsers(staffOnly)
     } catch (err: any) {
       console.error('Gagal memuat pengguna', err)
     } finally {
@@ -81,6 +82,7 @@ export default function UserManagementContent() {
   }
 
   const filteredUsers = users.filter((u) => {
+    if (u.role?.toUpperCase() === 'CUSTOMER') return false
     const matchRole = roleFilter === 'ALL' || u.role?.toUpperCase() === roleFilter
     const matchSearch =
       (u.name && u.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -91,8 +93,8 @@ export default function UserManagementContent() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black text-gray-900 tracking-tight">User Management & Hak Akses</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Kelola akun customer, admin tiket, dan staf scanner pintu masuk konser</p>
+        <h1 className="text-2xl font-black text-gray-900 tracking-tight">User Management </h1>
+        <p className="text-sm text-gray-500 mt-0.5">Kelola akun administrator, superadmin, dan staf penjaga tiket konser</p>
       </div>
 
       {message && (
@@ -116,9 +118,9 @@ export default function UserManagementContent() {
 
       <div className="bg-white rounded-2xl shadow-xs border border-gray-100 p-6">
         <div className="mb-4">
-          <h2 className="font-bold text-gray-900 text-base">Undang Admin / Penjaga Baru</h2>
+          <h2 className="font-bold text-gray-900 text-base">Undang Admin </h2>
           <p className="text-xs text-gray-400 mt-0.5">
-            Kirim surat undangan dan tautan aktivasi akun via protokol SMTP ke email petugas
+            Surat undangan akan terkirim lewat email
           </p>
         </div>
         <form onSubmit={handleInvite} className="flex flex-col sm:flex-row gap-3">
@@ -152,9 +154,9 @@ export default function UserManagementContent() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
         <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <h2 className="font-bold text-gray-900 text-base">Daftar Pengguna</h2>
+            <h2 className="font-bold text-gray-900 text-base">Daftar Akun Staff & Admin</h2>
             <span className="px-2.5 py-0.5 rounded-full bg-purple-50 text-[#7C3AED] text-xs font-bold">
-              {users.length} Total
+              {users.length} Staff
             </span>
           </div>
 
@@ -164,11 +166,10 @@ export default function UserManagementContent() {
               onChange={(e) => setRoleFilter(e.target.value)}
               className="w-full sm:w-44 px-3.5 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-hidden focus:border-[#7C3AED] font-semibold text-gray-700"
             >
-              <option value="ALL">Semua Peran</option>
+              <option value="ALL">Semua Peran Staff</option>
               <option value="SUPERADMIN">SUPERADMIN</option>
               <option value="ADMIN">ADMIN</option>
               <option value="GUARD">GUARD</option>
-              <option value="CUSTOMER">CUSTOMER</option>
             </select>
 
             <div className="relative w-full sm:w-60">
@@ -205,14 +206,14 @@ export default function UserManagementContent() {
                   <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
                     <div className="flex items-center justify-center gap-2">
                       <div className="w-5 h-5 border-2 border-[#7C3AED] border-t-transparent rounded-full animate-spin"></div>
-                      <span>Memuat daftar pengguna...</span>
+                      <span>Memuat daftar akun staff...</span>
                     </div>
                   </td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
-                    Belum ada pengguna yang sesuai dengan filter
+                    Belum ada akun staff yang sesuai dengan filter
                   </td>
                 </tr>
               ) : (

@@ -16,6 +16,8 @@ export default function LogsContent() {
   const [error, setError] = useState('')
   const [roleFilter, setRoleFilter] = useState('ALL')
   const [searchQuery, setSearchQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   const fetchLogs = async () => {
     setIsLoading(true)
@@ -35,6 +37,10 @@ export default function LogsContent() {
     fetchLogs()
   }, [])
 
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [roleFilter, searchQuery])
+
   const filteredLogs = logs.filter((log) => {
     const matchRole = roleFilter === 'ALL' || log.role?.toUpperCase() === roleFilter
     const matchSearch =
@@ -44,6 +50,10 @@ export default function LogsContent() {
     return matchRole && matchSearch
   })
 
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / itemsPerPage))
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedLogs = filteredLogs.slice(startIndex, startIndex + itemsPerPage)
+
   const getRoleBadge = (role: string) => {
     const r = role?.toUpperCase()
     if (r === 'SUPERADMIN') return 'bg-purple-100 text-[#7C3AED] border-purple-200'
@@ -52,12 +62,18 @@ export default function LogsContent() {
     return 'bg-emerald-100 text-emerald-700 border-emerald-200'
   }
 
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-gray-900 tracking-tight">System Activity Logs</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Catatan aktivitas dan riwayat operasional sistem secara real-time</p>
+          <p className="text-sm text-gray-500 mt-0.5">Catatan audit riwayat aktivitas sistem per 10 item per halaman</p>
         </div>
         <button
           type="button"
@@ -86,8 +102,8 @@ export default function LogsContent() {
             </svg>
           </div>
           <div>
-            <h3 className="text-lg font-black text-gray-900">{logs.length} Aktivitas Tercatat</h3>
-            <p className="text-xs text-gray-400">Audit trail lengkap tindakan pengguna dan admin</p>
+            <h3 className="text-lg font-black text-gray-900">{logs.length} Total Aktivitas</h3>
+            <p className="text-xs text-gray-400">Menampilkan 10 riwayat log per halaman secara terpaginasi</p>
           </div>
         </div>
 
@@ -143,14 +159,14 @@ export default function LogsContent() {
                     </div>
                   </td>
                 </tr>
-              ) : filteredLogs.length === 0 ? (
+              ) : paginatedLogs.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
                     Belum ada log yang sesuai dengan filter
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log) => (
+                paginatedLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-purple-50/20 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap text-xs font-mono text-gray-500">
                       {log.time}
@@ -179,6 +195,70 @@ export default function LogsContent() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="p-4 border-t border-gray-100 bg-[#FAFAFD] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <p className="text-xs text-gray-500">
+            Menampilkan{' '}
+            <strong className="text-gray-900">
+              {filteredLogs.length === 0 ? 0 : startIndex + 1}
+            </strong>{' '}
+            -{' '}
+            <strong className="text-gray-900">
+              {Math.min(startIndex + itemsPerPage, filteredLogs.length)}
+            </strong>{' '}
+            dari <strong className="text-gray-900">{filteredLogs.length}</strong> aktivitas
+          </p>
+
+          <div className="flex items-center gap-1.5 self-end sm:self-auto">
+            <button
+              type="button"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1 || filteredLogs.length === 0}
+              className="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-white hover:text-[#7C3AED] disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
+            >
+              Sebelumnya
+            </button>
+
+            {Array.from({ length: totalPages }, (_, idx) => idx + 1)
+              .filter((page) => {
+                return (
+                  page === 1 ||
+                  page === totalPages ||
+                  Math.abs(page - currentPage) <= 1
+                )
+              })
+              .map((page, idx, arr) => {
+                const prevPage = arr[idx - 1]
+                const showEllipsis = prevPage && page - prevPage > 1
+
+                return (
+                  <span key={page} className="flex items-center gap-1.5">
+                    {showEllipsis && <span className="text-xs text-gray-400 px-1">...</span>}
+                    <button
+                      type="button"
+                      onClick={() => handlePageChange(page)}
+                      className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        currentPage === page
+                          ? 'bg-[#7C3AED] text-white shadow-xs'
+                          : 'border border-gray-200 text-gray-600 hover:bg-white hover:text-[#7C3AED]'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  </span>
+                )
+              })}
+
+            <button
+              type="button"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages || filteredLogs.length === 0}
+              className="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-white hover:text-[#7C3AED] disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
+            >
+              Selanjutnya
+            </button>
+          </div>
         </div>
       </div>
     </div>
