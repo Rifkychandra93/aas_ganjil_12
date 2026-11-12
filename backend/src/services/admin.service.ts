@@ -1,6 +1,9 @@
 import prisma from "@/config/prisma";
 
 export const dashboardService = async () => {
+  const currentYear = new Date().getFullYear();
+  const startOfYear = new Date(`${currentYear}-01-01T00:00:00.000Z`);
+
   const [
     totalUsers,
     totalArtists,
@@ -11,6 +14,8 @@ export const dashboardService = async () => {
     revenue,
     ticketsSold,
     recentOrders,
+    yearlyOrders,
+    ticketCategories,
   ] = await Promise.all([
     prisma.user.count({
       where: {
@@ -61,6 +66,23 @@ export const dashboardService = async () => {
         },
       },
     }),
+    prisma.order.findMany({
+      where: {
+        createdAt: {
+          gte: startOfYear,
+        },
+      },
+      include: {
+        items: true,
+      },
+    }),
+    prisma.ticketCategory.findMany({
+      select: {
+        name: true,
+        quota: true,
+        remainingQuota: true,
+      },
+    }),
   ]);
 
   const transactions = recentOrders.map((order) => {
@@ -79,6 +101,38 @@ export const dashboardService = async () => {
     };
   });
 
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+  const monthlyStats = monthNames.map((month) => ({
+    month,
+    revenue: 0,
+    tickets: 0,
+  }));
+
+  yearlyOrders.forEach((order) => {
+    const monthIdx = order.createdAt.getMonth();
+    const qty = order.items.reduce((acc, curr) => acc + curr.quantity, 0);
+    monthlyStats[monthIdx].tickets += qty;
+    if (order.status === "PAID") {
+      monthlyStats[monthIdx].revenue += order.totalPrice;
+    }
+  });
+
+  const totalSoldAll = ticketCategories.reduce(
+    (acc, curr) => acc + Math.max(0, curr.quota - curr.remainingQuota),
+    0
+  );
+
+  const categoryDistribution = ticketCategories.slice(0, 5).map((cat) => {
+    const sold = Math.max(0, cat.quota - cat.remainingQuota);
+    const percentage = totalSoldAll > 0 ? Math.round((sold / totalSoldAll) * 100) : 0;
+    return {
+      name: cat.name,
+      sold,
+      quota: cat.quota,
+      percentage,
+    };
+  });
+
   const stats = {
     totalRevenue: revenue._sum.totalPrice ?? 0,
     totalTicketsSold: ticketsSold._sum.quantity ?? 0,
@@ -88,6 +142,8 @@ export const dashboardService = async () => {
     totalOrders,
     pendingOrders,
     paidOrders,
+    monthlyStats,
+    categoryDistribution,
   };
 
   return {

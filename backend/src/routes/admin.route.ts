@@ -8,7 +8,7 @@ const router = Router();
 router.get(
   "/dashboard",
   authMiddleware,
-  roleMiddleware("ADMIN"),
+  roleMiddleware("ADMIN", "SUPERADMIN"),
   dashboard
 );
 

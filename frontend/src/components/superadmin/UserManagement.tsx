@@ -2,195 +2,260 @@ import { useEffect, useState } from 'react'
 import api from '../../utils/api'
 
 interface UserItem {
-    id: string
-    name: string
-    email: string
-    role: string
-    status: string
+  id: string
+  name: string
+  email: string
+  role: string
+  status: string
 }
 
 export default function UserManagementContent() {
-    const [users, setUsers] = useState<UserItem[]>([])
-    const [isLoading, setIsLoading] = useState(true)
-    const [inviteEmail, setInviteEmail] = useState('')
-    const [inviteRole, setInviteRole] = useState('ADMIN')
-    const [isSubmitting, setIsSubmitting] = useState(false)
-    const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [users, setUsers] = useState<UserItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState('ADMIN')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [roleFilter, setRoleFilter] = useState('ALL')
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-    const fetchUsers = async () => {
-        setIsLoading(true)
-        try {
-            const res = await api.get('/users')
-            const data = Array.isArray(res.data) ? res.data : (res.data?.data || [])
-            setUsers(data)
-        } catch (err: any) {
-            console.error('Gagal memuat pengguna', err)
-        } finally {
-            setIsLoading(false)
-        }
+  const fetchUsers = async () => {
+    setIsLoading(true)
+    try {
+      const res = await api.get('/users')
+      const data = Array.isArray(res.data) ? res.data : (res.data?.data || [])
+      setUsers(data)
+    } catch (err: any) {
+      console.error('Gagal memuat pengguna', err)
+    } finally {
+      setIsLoading(false)
     }
+  }
 
-    useEffect(() => {
-        fetchUsers()
-    }, [])
+  useEffect(() => {
+    fetchUsers()
+  }, [])
 
-    const handleInvite = async (e: React.FormEvent) => {
-        e.preventDefault()
-        setIsSubmitting(true)
-        setMessage(null)
-        try {
-            const res = await api.post('/users/invite', {
-                email: inviteEmail,
-                role: inviteRole,
-            })
-            setMessage({
-                type: 'success',
-                text: res.data?.message || `Undangan berhasil dikirim via SMTP ke ${inviteEmail}`,
-            })
-            setInviteEmail('')
-            fetchUsers()
-        } catch (err: any) {
-            setMessage({
-                type: 'error',
-                text: err.response?.data?.message || 'Gagal mengirim undangan email',
-            })
-        } finally {
-            setIsSubmitting(false)
-        }
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+    setMessage(null)
+    try {
+      const res = await api.post('/users/invite', {
+        email: inviteEmail,
+        role: inviteRole,
+      })
+      setMessage({
+        type: 'success',
+        text: res.data?.message || `Undangan berhasil dikirim via SMTP ke ${inviteEmail}`,
+      })
+      setInviteEmail('')
+      fetchUsers()
+    } catch (err: any) {
+      setMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'Gagal mengirim undangan email',
+      })
+    } finally {
+      setIsSubmitting(false)
     }
+  }
 
-    const handleDelete = async (id: string) => {
-        if (confirm('Yakin ingin menghapus user ini dari sistem?')) {
-            try {
-                await api.delete(`/users/${id}`)
-                setUsers(users.filter((u) => u.id !== id))
-            } catch (err: any) {
-                alert(err.response?.data?.message || 'Gagal menghapus user')
-            }
-        }
+  const handleDelete = async (id: string) => {
+    if (confirm('Yakin ingin menghapus user ini dari sistem?')) {
+      try {
+        await api.delete(`/users/${id}`)
+        setUsers(users.filter((u) => u.id !== id))
+      } catch (err: any) {
+        alert(err.response?.data?.message || 'Gagal menghapus user')
+      }
     }
+  }
 
-    return (
-        <div>
-            <div className="mb-6">
-                <h1 className="text-2xl font-bold text-gray-800">User Management</h1>
-                <p className="text-sm text-gray-500">Kelola akses admin dan petugas penjaga scanner tiket</p>
-            </div>
+  const getRoleBadge = (role: string) => {
+    const r = role?.toUpperCase()
+    if (r === 'SUPERADMIN') return 'bg-purple-100 text-[#7C3AED] border-purple-200'
+    if (r === 'ADMIN') return 'bg-blue-100 text-blue-700 border-blue-200'
+    if (r === 'GUARD') return 'bg-amber-100 text-amber-700 border-amber-200'
+    return 'bg-emerald-100 text-emerald-700 border-emerald-200'
+  }
 
-            {message && (
-                <div
-                    className={`p-4 rounded-xl mb-6 text-sm font-medium border ${
-                        message.type === 'success'
-                            ? 'bg-green-50 text-green-700 border-green-200'
-                            : 'bg-red-50 text-red-700 border-red-200'
-                    }`}
-                >
-                    {message.text}
-                </div>
-            )}
+  const filteredUsers = users.filter((u) => {
+    const matchRole = roleFilter === 'ALL' || u.role?.toUpperCase() === roleFilter
+    const matchSearch =
+      (u.name && u.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (u.email && u.email.toLowerCase().includes(searchQuery.toLowerCase()))
+    return matchRole && matchSearch
+  })
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-                <h2 className="font-bold text-gray-800 mb-1">Undang Admin / Penjaga Baru</h2>
-                <p className="text-xs text-gray-500 mb-4">
-                    Kirim email undangan otomatis via protokol SMTP ke alamat email tujuan
-                </p>
-                <form onSubmit={handleInvite} className="flex flex-col md:flex-row gap-3">
-                    <input
-                        type="email"
-                        placeholder="Masukkan Email Aktif (cth: petugas@gmail.com)"
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                        required
-                        className="flex-1 border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    />
-                    <select
-                        value={inviteRole}
-                        onChange={(e) => setInviteRole(e.target.value)}
-                        className="border border-gray-200 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium bg-white"
-                    >
-                        <option value="ADMIN">Admin</option>
-                        <option value="GUARD">Penjaga (Scanner)</option>
-                    </select>
-                    <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                        {isSubmitting ? (
-                            <>
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                Mengirim SMTP...
-                            </>
-                        ) : (
-                            'Kirim Undangan'
-                        )}
-                    </button>
-                </form>
-            </div>
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-black text-gray-900 tracking-tight">User Management & Hak Akses</h1>
+        <p className="text-sm text-gray-500 mt-0.5">Kelola akun customer, admin tiket, dan staf scanner pintu masuk konser</p>
+      </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm text-gray-600">
-                        <thead className="bg-gray-50 text-gray-700 uppercase text-xs border-b border-gray-100">
-                            <tr>
-                                <th className="px-6 py-4">Nama</th>
-                                <th className="px-6 py-4">Email</th>
-                                <th className="px-6 py-4">Role</th>
-                                <th className="px-6 py-4">Status</th>
-                                <th className="px-6 py-4 text-right">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {isLoading ? (
-                                <tr>
-                                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                                        Memuat data user...
-                                    </td>
-                                </tr>
-                            ) : users.length === 0 ? (
-                                <tr>
-                                    <td colSpan={5} className="px-6 py-8 text-center text-gray-400">
-                                        Belum ada pengguna terdaftar
-                                    </td>
-                                </tr>
-                            ) : (
-                                users.map((user) => (
-                                    <tr key={user.id} className="hover:bg-gray-50/80 transition-colors">
-                                        <td className="px-6 py-4 font-semibold text-gray-900">{user.name}</td>
-                                        <td className="px-6 py-4 font-mono text-xs text-gray-600">{user.email}</td>
-                                        <td className="px-6 py-4">
-                                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                                                user.role === 'SUPERADMIN'
-                                                    ? 'bg-purple-100 text-purple-700'
-                                                    : user.role === 'ADMIN'
-                                                    ? 'bg-blue-100 text-blue-700'
-                                                    : user.role === 'GUARD'
-                                                    ? 'bg-amber-100 text-amber-700'
-                                                    : 'bg-emerald-100 text-emerald-700'
-                                            }`}>
-                                                {user.role}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
-                                                {user.status || 'Active'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <button
-                                                onClick={() => handleDelete(user.id)}
-                                                className="text-red-600 hover:text-red-800 font-medium hover:underline text-xs"
-                                            >
-                                                Hapus
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+      {message && (
+        <div
+          className={`p-4 rounded-2xl text-xs font-semibold border flex items-center justify-between ${
+            message.type === 'success'
+              ? 'bg-green-50 text-green-700 border-green-200'
+              : 'bg-red-50 text-red-700 border-red-200'
+          }`}
+        >
+          <span>{message.text}</span>
+          <button
+            type="button"
+            onClick={() => setMessage(null)}
+            className="text-gray-400 hover:text-gray-700 font-bold ml-4 cursor-pointer"
+          >
+            &times;
+          </button>
         </div>
-    )
+      )}
+
+      <div className="bg-white rounded-2xl shadow-xs border border-gray-100 p-6">
+        <div className="mb-4">
+          <h2 className="font-bold text-gray-900 text-base">Undang Admin / Penjaga Baru</h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Kirim surat undangan dan tautan aktivasi akun via protokol SMTP ke email petugas
+          </p>
+        </div>
+        <form onSubmit={handleInvite} className="flex flex-col sm:flex-row gap-3">
+          <input
+            type="email"
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+            required
+            placeholder="Masukkan Email Aktif (cth: petugas@gmail.com)"
+            className="flex-1 px-4 py-2.5 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-hidden focus:border-[#7C3AED] focus:bg-white focus:ring-2 focus:ring-purple-100"
+          />
+          <select
+            value={inviteRole}
+            onChange={(e) => setInviteRole(e.target.value)}
+            className="px-4 py-2.5 text-xs sm:text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-hidden focus:border-[#7C3AED] font-semibold text-gray-700"
+          >
+            <option value="ADMIN">ADMIN</option>
+            <option value="GUARD">GUARD / PENJAGA</option>
+            <option value="SUPERADMIN">SUPERADMIN</option>
+          </select>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="px-6 py-2.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-purple-200 transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap"
+          >
+            {isSubmitting ? 'Mengirim...' : 'Kirim Undangan'}
+          </button>
+        </form>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
+        <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <h2 className="font-bold text-gray-900 text-base">Daftar Pengguna</h2>
+            <span className="px-2.5 py-0.5 rounded-full bg-purple-50 text-[#7C3AED] text-xs font-bold">
+              {users.length} Total
+            </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="w-full sm:w-44 px-3.5 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-hidden focus:border-[#7C3AED] font-semibold text-gray-700"
+            >
+              <option value="ALL">Semua Peran</option>
+              <option value="SUPERADMIN">SUPERADMIN</option>
+              <option value="ADMIN">ADMIN</option>
+              <option value="GUARD">GUARD</option>
+              <option value="CUSTOMER">CUSTOMER</option>
+            </select>
+
+            <div className="relative w-full sm:w-60">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari nama atau email..."
+                className="w-full pl-10 pr-4 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-hidden focus:border-[#7C3AED] focus:bg-white focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-gray-600">
+            <thead className="bg-[#F9FAFC] text-gray-500 uppercase text-xs border-b border-gray-100">
+              <tr>
+                <th className="px-6 py-4 font-bold">Pengguna</th>
+                <th className="px-6 py-4 font-bold">Email</th>
+                <th className="px-6 py-4 font-bold">Peran (Role)</th>
+                <th className="px-6 py-4 font-bold">Status</th>
+                <th className="px-6 py-4 font-bold text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {isLoading ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-5 h-5 border-2 border-[#7C3AED] border-t-transparent rounded-full animate-spin"></div>
+                      <span>Memuat daftar pengguna...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
+                    Belum ada pengguna yang sesuai dengan filter
+                  </td>
+                </tr>
+              ) : (
+                filteredUsers.map((user) => (
+                  <tr key={user.id} className="hover:bg-purple-50/20 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#6D28D9] to-[#8B5CF6] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                          {user.name ? user.name[0].toUpperCase() : 'U'}
+                        </div>
+                        <span className="font-bold text-gray-900">{user.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-xs font-mono text-gray-600">
+                      {user.email}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${getRoleBadge(user.role)}`}>
+                        {user.role}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-green-50 text-green-700 border border-green-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                        {user.status || 'Aktif'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(user.id)}
+                        className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                      >
+                        Hapus
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
 }

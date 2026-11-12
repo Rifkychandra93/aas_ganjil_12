@@ -8,9 +8,11 @@ import TicketDetail from './pages/pembeli/TicketDetail'
 import Checkout from './pages/pembeli/Checkout'
 import MyTickets from './pages/pembeli/MyTicket'
 import AdminDashboard from './pages/admin/Dashboard'
+import AdminEvents from './pages/admin/Events'
 import AdminArtist from './pages/admin/Artist'
 import AdminTicket from './pages/admin/Ticket'
 import SuperadminDashboard from './pages/superadmin/Dashboard'
+import SuperadminEvents from './pages/superadmin/Events'
 import SuperadminArtist from './pages/superadmin/Artist'
 import SuperadminTicket from './pages/superadmin/Ticket'
 import SuperadminLogs from './pages/superadmin/Logs'
@@ -32,12 +34,14 @@ function App() {
 
       <Route element={<AdminLayout role="ADMIN" />}>
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin/events" element={<AdminEvents />} />
         <Route path="/admin/artist" element={<AdminArtist />} />
         <Route path="/admin/ticket" element={<AdminTicket />} />
       </Route>
 
       <Route element={<AdminLayout role="SUPERADMIN" />}>
         <Route path="/superadmin" element={<SuperadminDashboard />} />
+        <Route path="/superadmin/events" element={<SuperadminEvents />} />
         <Route path="/superadmin/artist" element={<SuperadminArtist />} />
         <Route path="/superadmin/ticket" element={<SuperadminTicket />} />
         <Route path="/superadmin/logs" element={<SuperadminLogs />} />
