@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../../utils/api'
 
@@ -58,6 +58,8 @@ export default function DashboardContent() {
   const [isLoading, setIsLoading] = useState(true)
   const [chartMetric, setChartMetric] = useState<'revenue' | 'tickets'>('revenue')
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const [donutAnimated, setDonutAnimated] = useState(false)
+  const donutRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -135,6 +137,32 @@ export default function DashboardContent() {
     fetchDashboardData()
   }, [])
 
+  useEffect(() => {
+    if (donutAnimated) return
+    const el = donutRef.current
+    if (!el) return
+
+    if (typeof IntersectionObserver === 'undefined') {
+      setDonutAnimated(true)
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setDonutAnimated(true)
+            observer.disconnect()
+          }
+        })
+      },
+      { threshold: 0.3 }
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [donutAnimated])
+
   const formatRupiah = (val: number) => {
     return 'Rp ' + Number(val || 0).toLocaleString('id-ID')
   }
@@ -188,7 +216,7 @@ export default function DashboardContent() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-gray-900 tracking-tight">Dashboard Ringkasan & Grafik Garis</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Analisis data real-time penjualan tiket mingguan dan operasional platform</p>
+          <p className="text-sm text-gray-500 mt-0.5">Analisis data realtime penjualan tiket mingguan dan operasional platform</p>
         </div>
         <div className="flex items-center gap-3">
           <Link
@@ -435,7 +463,7 @@ export default function DashboardContent() {
           </div>
 
           <div className="my-6 flex flex-col items-center">
-            <div className="relative w-44 h-44 flex items-center justify-center">
+            <div ref={donutRef} className="relative w-44 h-44 flex items-center justify-center">
               <svg viewBox="0 0 160 160" className="w-full h-full transform -rotate-90">
                 <circle
                   cx="80"
@@ -451,6 +479,7 @@ export default function DashboardContent() {
                     const strokeOffset = -(accumulatedPercent / 100) * donutCircumference
                     accumulatedPercent += cat.percentage
                     const col = categoryColors[idx % categoryColors.length]
+                    const delay = idx * 180
 
                     return (
                       <circle
@@ -461,10 +490,16 @@ export default function DashboardContent() {
                         stroke={col}
                         strokeWidth="16"
                         fill="none"
-                        strokeDasharray={`${strokeDash} ${donutCircumference}`}
+                        strokeDasharray={
+                          donutAnimated
+                            ? `${strokeDash} ${donutCircumference}`
+                            : `0 ${donutCircumference}`
+                        }
                         strokeDashoffset={strokeOffset}
                         strokeLinecap="round"
-                        className="transition-all duration-500"
+                        style={{
+                          transition: `stroke-dasharray 900ms cubic-bezier(0.4, 0, 0.2, 1) ${delay}ms`,
+                        }}
                       />
                     )
                   })
@@ -476,19 +511,39 @@ export default function DashboardContent() {
                     stroke="#7C3AED"
                     strokeWidth="16"
                     fill="none"
-                    strokeDasharray={`${donutCircumference * 0.15} ${donutCircumference}`}
+                    strokeDasharray={
+                      donutAnimated
+                        ? `${donutCircumference * 0.15} ${donutCircumference}`
+                        : `0 ${donutCircumference}`
+                    }
                     strokeDashoffset="0"
                     strokeLinecap="round"
                     className="opacity-40"
+                    style={{
+                      transition: 'stroke-dasharray 900ms cubic-bezier(0.4, 0, 0.2, 1)',
+                    }}
                   />
                 )}
               </svg>
 
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-2xl font-black text-gray-900 leading-none">
+                <span
+                  className="text-2xl font-black text-gray-900 leading-none"
+                  style={{
+                    opacity: donutAnimated ? 1 : 0,
+                    transform: donutAnimated ? 'scale(1)' : 'scale(0.6)',
+                    transition: 'opacity 500ms ease 400ms, transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1) 400ms',
+                  }}
+                >
                   {totalCategorySold > 0 ? totalCategorySold : stats.totalTicketsSold}
                 </span>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">
+                <span
+                  className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1"
+                  style={{
+                    opacity: donutAnimated ? 1 : 0,
+                    transition: 'opacity 500ms ease 500ms',
+                  }}
+                >
                   Tiket Terjual
                 </span>
               </div>
@@ -498,8 +553,17 @@ export default function DashboardContent() {
               {stats.categoryDistribution && stats.categoryDistribution.length > 0 ? (
                 stats.categoryDistribution.map((cat, idx) => {
                   const col = categoryColors[idx % categoryColors.length]
+                  const delay = idx * 180 + 300
                   return (
-                    <div key={cat.name} className="flex items-center justify-between text-xs font-semibold py-1 border-b border-gray-50 last:border-b-0">
+                    <div
+                      key={cat.name}
+                      className="flex items-center justify-between text-xs font-semibold py-1 border-b border-gray-50 last:border-b-0"
+                      style={{
+                        opacity: donutAnimated ? 1 : 0,
+                        transform: donutAnimated ? 'translateX(0)' : 'translateX(-8px)',
+                        transition: `opacity 400ms ease ${delay}ms, transform 400ms ease ${delay}ms`,
+                      }}
+                    >
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: col }}></span>
                         <span className="text-gray-800 line-clamp-1">{cat.name}</span>
