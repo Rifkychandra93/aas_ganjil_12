@@ -113,8 +113,10 @@ export default function DashboardContent() {
       if (isNaN(date.getTime())) return
       const jsDay = date.getDay()
       const idx = jsDay === 0 ? 6 : jsDay - 1
-      base[idx].revenue += trx.totalAmount
-      base[idx].tickets += trx.quantity
+      if (trx.status === 'PAID' || trx.status === 'USED') {
+        base[idx].revenue += trx.totalAmount
+        base[idx].tickets += trx.quantity
+      }
     })
     return base
   })()
@@ -563,11 +565,13 @@ export default function DashboardContent() {
                       <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
                         trx.status === 'PAID'
                           ? 'bg-green-50 text-green-700 border border-green-200'
+                          : trx.status === 'USED'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                           : trx.status === 'PENDING'
                           ? 'bg-amber-50 text-amber-700 border border-amber-200'
                           : 'bg-gray-100 text-gray-600'
                       }`}>
-                        {trx.status}
+                        {trx.status === 'USED' ? 'SELESAI (SCAN)' : trx.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-xs text-gray-500 whitespace-nowrap">

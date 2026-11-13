@@ -17,13 +17,17 @@ export default function CheckoutContent() {
 
   useEffect(() => {
     const clientKey = import.meta.env.VITE_MIDTRANS_CLIENT_KEY || 'Mid-client-3T9RtG6iAKY7ueD1'
+    const isProd = import.meta.env.VITE_MIDTRANS_IS_PRODUCTION === 'true'
+    const scriptUrl = isProd
+      ? 'https://app.midtrans.com/snap/snap.js'
+      : 'https://app.sandbox.midtrans.com/snap/snap.js'
     const scriptId = 'midtrans-snap-script'
     let script = document.getElementById(scriptId) as HTMLScriptElement
 
     if (!script) {
       script = document.createElement('script')
       script.id = scriptId
-      script.src = 'https://app.sandbox.midtrans.com/snap/snap.js'
+      script.src = scriptUrl
       script.setAttribute('data-client-key', clientKey)
       document.body.appendChild(script)
     }
@@ -40,11 +44,26 @@ export default function CheckoutContent() {
       })
 
       const snapToken = res.data?.snapToken || res.data?.data?.snapToken
+      const ticketCode = res.data?.data?.ticketCode || res.data?.ticketCode
 
       if (window.snap && snapToken && !snapToken.startsWith('snap-fallback')) {
         window.snap.pay(snapToken, {
-          onSuccess: () => navigate('/my-tickets'),
-          onPending: () => navigate('/my-tickets'),
+          onSuccess: async () => {
+            try {
+              await api.post('/orders/verify', { ticketCode })
+            } catch (verifyErr) {
+              console.error(verifyErr)
+            }
+            navigate('/my-tickets')
+          },
+          onPending: async () => {
+            try {
+              await api.post('/orders/verify', { ticketCode })
+            } catch (verifyErr) {
+              console.error(verifyErr)
+            }
+            navigate('/my-tickets')
+          },
           onError: () => {
             alert('Pembayaran Midtrans gagal atau dibatalkan.')
             navigate('/my-tickets')
@@ -97,7 +116,7 @@ export default function CheckoutContent() {
           </div>
           <div>
             <h1 className="text-2xl font-black text-gray-900">Konfirmasi Pembayaran</h1>
-            <p className="text-sm text-gray-500 font-medium">Gateway pembayaran resmi via Midtrans</p>
+            <p className="text-sm text-gray-500 font-medium">Gateway pembayaran resmi via Midtrans (QRIS, E-Wallet, VA)</p>
           </div>
         </div>
 

@@ -1,7 +1,7 @@
 import prisma from "@/config/prisma";
 import { generateTicketCode } from "@/utils/generate-ticket-code";
 import { generateQRCodeDataUrl, generateBarcode128Svg } from "@/utils/generate-barcode";
-import { createMidtransSnapTransaction } from "./midtrans.service";
+import { createMidtransSnapTransaction, getMidtransTransactionStatus } from "./midtrans.service";
 import { sendTicketReceiptMail } from "./mail.service";
 import { createSystemLog } from "./log.service";
 import { PaymentMethod } from "@prisma/client";
@@ -115,8 +115,8 @@ export const createOrderService = async (
         ticketCode,
         paymentMethod: paymentMethodEnum,
         totalPrice,
-        status: "PAID",
-        paidAt: new Date(),
+        status: "PENDING",
+        paidAt: null,
         qrCode: qrCodeDataUrl,
         barcode: barcodeSvgDataUrl,
         snapToken: midtransResult.snapToken,
@@ -148,19 +148,11 @@ export const createOrderService = async (
   });
 
   const eventTitle = ticketData[0]?.ticket?.event?.title || "Konser Musik";
-  await sendTicketReceiptMail(
-    user.email,
-    user.name,
-    eventTitle,
-    ticketCode,
-    qrCodeDataUrl
-  );
-
   await createSystemLog({
     userId: user.id,
     userEmail: user.email,
     role: user.role,
-    action: `Pemesanan Tiket: ${eventTitle} (${ticketCode})`,
+    action: `Menunggu Pembayaran Tiket: ${eventTitle} (${ticketCode})`,
     details: `Total: Rp ${totalPrice.toLocaleString("id-ID")}`,
   });
 
@@ -182,7 +174,7 @@ export const createOrderService = async (
   return {
     statusCode: 201,
     success: true,
-    message: "Order berhasil dibuat",
+    message: "Order berhasil dibuat, silakan selesaikan pembayaran",
     snapToken: midtransResult.snapToken,
     redirectUrl: midtransResult.redirectUrl,
     data: {
@@ -193,6 +185,284 @@ export const createOrderService = async (
   };
 };
 
+export const verifyPaymentService = async (
+  orderIdOrTicketCode: string,
+  actorUserId?: string
+) => {
+  if (!orderIdOrTicketCode) {
+    return {
+      statusCode: 400,
+      success: false,
+      message: "Order ID atau kode tiket wajib diisi",
+    };
+  }
+
+  const order = await prisma.order.findFirst({
+    where: {
+      OR: [
+        { id: orderIdOrTicketCode },
+        { ticketCode: orderIdOrTicketCode },
+      ],
+    },
+    include: {
+      user: true,
+      items: {
+        include: {
+          ticketCategory: {
+            include: {
+              event: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!order) {
+    return {
+      statusCode: 404,
+      success: false,
+      message: "Order tidak ditemukan",
+    };
+  }
+
+  if (order.status === "PAID" || order.status === "USED") {
+    return {
+      statusCode: 200,
+      success: true,
+      message: "Pembayaran telah berhasil terverifikasi",
+      isPaid: true,
+      data: order,
+    };
+  }
+
+  if (order.status === "CANCELLED") {
+    return {
+      statusCode: 400,
+      success: false,
+      message: "Pesanan telah dibatalkan atau kedaluwarsa",
+      isPaid: false,
+      data: order,
+    };
+  }
+
+  const statusResult = await getMidtransTransactionStatus(order.ticketCode);
+
+  if (statusResult.isPaid) {
+    const updatedOrder = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        status: "PAID",
+        paidAt: new Date(),
+      },
+      include: {
+        user: true,
+        items: {
+          include: {
+            ticketCategory: {
+              include: {
+                event: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const eventTitle = updatedOrder.items[0]?.ticketCategory?.event?.title || "Konser Musik";
+    try {
+      await sendTicketReceiptMail(
+        updatedOrder.user.email,
+        updatedOrder.user.name,
+        eventTitle,
+        updatedOrder.ticketCode,
+        updatedOrder.qrCode || ""
+      );
+    } catch (mailErr) {
+      console.error(mailErr);
+    }
+
+    try {
+      await createSystemLog({
+        userId: updatedOrder.user.id,
+        userEmail: updatedOrder.user.email,
+        role: updatedOrder.user.role,
+        action: `Pembayaran Berhasil: ${eventTitle} (${updatedOrder.ticketCode})`,
+        details: `Total: Rp ${updatedOrder.totalPrice.toLocaleString("id-ID")} via ${statusResult.paymentType || "Midtrans"}`,
+      });
+    } catch (logErr) {
+      console.error(logErr);
+    }
+
+    return {
+      statusCode: 200,
+      success: true,
+      message: "Pembayaran berhasil dikonfirmasi!",
+      isPaid: true,
+      data: updatedOrder,
+    };
+  }
+
+  if (
+    statusResult.transactionStatus === "expire" ||
+    statusResult.transactionStatus === "cancel" ||
+    statusResult.transactionStatus === "deny"
+  ) {
+    const updatedOrder = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        status: "CANCELLED",
+      },
+      include: {
+        items: true,
+      },
+    });
+
+    for (const item of order.items) {
+      await prisma.ticketCategory.update({
+        where: { id: item.ticketCategoryId },
+        data: {
+          remainingQuota: {
+            increment: item.quantity,
+          },
+        },
+      });
+    }
+
+    return {
+      statusCode: 200,
+      success: false,
+      message: "Pembayaran telah kedaluwarsa atau dibatalkan",
+      isPaid: false,
+      data: updatedOrder,
+    };
+  }
+
+  return {
+    statusCode: 200,
+    success: false,
+    message: "Pembayaran belum diselesaikan",
+    isPaid: false,
+    data: order,
+  };
+};
+
+export const simulateSandboxPaymentService = async (orderIdOrTicketCode: string) => {
+  const isProduction = process.env.MIDTRANS_IS_PRODUCTION === "true";
+  if (isProduction) {
+    return {
+      statusCode: 403,
+      success: false,
+      message: "Simulasi pembayaran hanya diizinkan pada mode Sandbox",
+    };
+  }
+
+  const order = await prisma.order.findFirst({
+    where: {
+      OR: [
+        { id: orderIdOrTicketCode },
+        { ticketCode: orderIdOrTicketCode },
+      ],
+    },
+    include: {
+      user: true,
+      items: {
+        include: {
+          ticketCategory: {
+            include: {
+              event: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!order) {
+    return {
+      statusCode: 404,
+      success: false,
+      message: "Order tidak ditemukan",
+    };
+  }
+
+  if (order.status === "PAID" || order.status === "USED") {
+    return {
+      statusCode: 200,
+      success: true,
+      message: "Pembayaran telah berhasil terverifikasi",
+      isPaid: true,
+      data: order,
+    };
+  }
+
+  const updatedOrder = await prisma.order.update({
+    where: { id: order.id },
+    data: {
+      status: "PAID",
+      paidAt: new Date(),
+    },
+    include: {
+      user: true,
+      items: {
+        include: {
+          ticketCategory: {
+            include: {
+              event: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const eventTitle = updatedOrder.items[0]?.ticketCategory?.event?.title || "Konser Musik";
+  try {
+    await sendTicketReceiptMail(
+      updatedOrder.user.email,
+      updatedOrder.user.name,
+      eventTitle,
+      updatedOrder.ticketCode,
+      updatedOrder.qrCode || ""
+    );
+  } catch (mailErr) {
+    console.error(mailErr);
+  }
+
+  try {
+    await createSystemLog({
+      userId: updatedOrder.user.id,
+      userEmail: updatedOrder.user.email,
+      role: updatedOrder.user.role,
+      action: `Simulasi Pembayaran QRIS Sandbox: ${eventTitle} (${updatedOrder.ticketCode})`,
+      details: `Total: Rp ${updatedOrder.totalPrice.toLocaleString("id-ID")}`,
+    });
+  } catch (logErr) {
+    console.error(logErr);
+  }
+
+  return {
+    statusCode: 200,
+    success: true,
+    message: "Simulasi pembayaran QRIS Sandbox berhasil! E-tiket Anda sekarang aktif.",
+    isPaid: true,
+    data: updatedOrder,
+  };
+};
+
+export const handleMidtransWebhookService = async (notificationBody: any) => {
+  const orderId = notificationBody?.order_id;
+  if (!orderId) {
+    return {
+      statusCode: 400,
+      success: false,
+      message: "Field order_id wajib ada pada notifikasi",
+    };
+  }
+
+  return await verifyPaymentService(orderId);
+};
+
 export const getMyOrdersService = async (userId: string) => {
   const orders = await prisma.order.findMany({
     where: { userId },
@@ -201,7 +471,11 @@ export const getMyOrdersService = async (userId: string) => {
         include: {
           ticketCategory: {
             include: {
-              event: true,
+              event: {
+                include: {
+                  artist: true,
+                },
+              },
             },
           },
         },
@@ -216,18 +490,26 @@ export const getMyOrdersService = async (userId: string) => {
     const firstItem = order.items[0];
     const event = firstItem?.ticketCategory?.event;
     const category = firstItem?.ticketCategory;
+    const isPaid = order.status === "PAID" || order.status === "USED";
 
     return {
       id: order.id,
       orderId: order.id,
       ticketCode: order.ticketCode,
       eventTitle: event?.title || "Konser Musik",
+      artistName: event?.artist?.name || "",
+      eventDate: event?.eventDate || order.createdAt,
+      location: event?.location || "Grand Arena",
+      poster: event?.poster || "",
       categoryName: category?.name || "Standard",
-      qrCode: order.qrCode || "",
-      barcode: order.barcode || "",
+      qrCode: isPaid ? (order.qrCode || "") : "",
+      barcode: isPaid ? (order.barcode || "") : "",
       isUsed: !!order.usedAt,
       status: order.status,
       totalPrice: order.totalPrice,
+      quantity: order.items.reduce((acc, curr) => acc + curr.quantity, 0),
+      snapToken: order.snapToken,
+      paidAt: order.paidAt,
       createdAt: order.createdAt,
     };
   });

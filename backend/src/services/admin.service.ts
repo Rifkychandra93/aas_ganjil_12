@@ -32,18 +32,29 @@ export const dashboardService = async () => {
     }),
     prisma.order.count({
       where: {
-        status: "PAID",
+        status: {
+          in: ["PAID", "USED"],
+        },
       },
     }),
     prisma.order.aggregate({
       where: {
-        status: "PAID",
+        status: {
+          in: ["PAID", "USED"],
+        },
       },
       _sum: {
         totalPrice: true,
       },
     }),
     prisma.orderItem.aggregate({
+      where: {
+        order: {
+          status: {
+            in: ["PAID", "USED"],
+          },
+        },
+      },
       _sum: {
         quantity: true,
       },
@@ -120,10 +131,9 @@ export const dashboardService = async () => {
     const monthIdx = order.createdAt.getMonth();
     const qty = order.items.reduce((acc, curr) => acc + curr.quantity, 0);
 
-    weeklyStats[dayIdx].tickets += qty;
-    monthlyStats[monthIdx].tickets += qty;
-
-    if (order.status === "PAID") {
+    if (order.status === "PAID" || order.status === "USED") {
+      weeklyStats[dayIdx].tickets += qty;
+      monthlyStats[monthIdx].tickets += qty;
       weeklyStats[dayIdx].revenue += order.totalPrice;
       monthlyStats[monthIdx].revenue += order.totalPrice;
     }

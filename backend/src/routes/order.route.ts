@@ -4,11 +4,20 @@ import {
   getMyOrders,
   getOrderById,
   scanTicket,
+  verifyPayment,
+  simulateSandboxPayment,
+  handleMidtransWebhook,
 } from "@/controllers/order.controller";
 import { authMiddleware } from "@/middlewares/auth.middleware";
 import { roleMiddleware } from "@/middlewares/role.middleware";
 
 const router = Router();
+
+router.post("/midtrans-webhook", handleMidtransWebhook);
+router.post("/notification", handleMidtransWebhook);
+router.post("/verify", authMiddleware, verifyPayment);
+router.post("/:id/verify", authMiddleware, verifyPayment);
+router.post("/simulate-sandbox", authMiddleware, simulateSandboxPayment);
 
 router.post("/", authMiddleware, createOrder);
 router.get("/me", authMiddleware, getMyOrders);

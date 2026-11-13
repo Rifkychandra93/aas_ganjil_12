@@ -55,33 +55,33 @@ export default function PembeliLayout() {
               <div className="hidden md:flex items-center gap-7">
                 <Link
                   to="/dashboard"
-                  className={`text-sm font-semibold transition-colors ${
-                    location.pathname === '/dashboard' ? 'text-[#7C3AED]' : 'text-gray-600 hover:text-[#7C3AED]'
+                  className={`text-sm font-semibold transition-all py-1 ${
+                    location.pathname === '/dashboard' ? 'text-[#7C3AED] border-b-2 border-[#7C3AED] font-bold' : 'text-gray-600 hover:text-[#7C3AED]'
                   }`}
                 >
-                  Home
+                  Beranda
                 </Link>
                 <button
                   type="button"
                   onClick={() => handleNavClick('artis-populer')}
-                  className="text-sm font-semibold text-gray-600 hover:text-[#7C3AED] transition-colors cursor-pointer"
+                  className="text-sm font-semibold text-gray-600 hover:text-[#7C3AED] transition-colors cursor-pointer py-1"
                 >
-                  Artist
+                  Artis
                 </button>
                 <button
                   type="button"
                   onClick={() => handleNavClick('konser-mendatang')}
-                  className="text-sm font-semibold text-gray-600 hover:text-[#7C3AED] transition-colors cursor-pointer"
+                  className="text-sm font-semibold text-gray-600 hover:text-[#7C3AED] transition-colors cursor-pointer py-1"
                 >
-                  Concerts
+                  Konser
                 </button>
                 <Link
                   to="/my-tickets"
-                  className={`text-sm font-semibold transition-colors ${
-                    location.pathname === '/my-tickets' ? 'text-[#7C3AED]' : 'text-gray-600 hover:text-[#7C3AED]'
+                  className={`text-sm font-semibold transition-all py-1 ${
+                    location.pathname === '/my-tickets' ? 'text-[#7C3AED] border-b-2 border-[#7C3AED] font-bold' : 'text-gray-600 hover:text-[#7C3AED]'
                   }`}
                 >
-                  My Tickets
+                  Tiket Saya
                 </Link>
               </div>
             </div>
@@ -166,28 +166,28 @@ export default function PembeliLayout() {
                 onClick={() => setMobileMenuOpen(false)}
                 className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED]"
               >
-                Home
+                Beranda
               </Link>
               <button
                 type="button"
                 onClick={() => handleNavClick('artis-populer')}
                 className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED]"
               >
-                Artist
+                Artis
               </button>
               <button
                 type="button"
                 onClick={() => handleNavClick('konser-mendatang')}
                 className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED]"
               >
-                Concerts
+                Konser
               </button>
               <Link
                 to="/my-tickets"
                 onClick={() => setMobileMenuOpen(false)}
                 className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED]"
               >
-                My Tickets
+                Tiket Saya
               </Link>
             </div>
           )}
