@@ -103,7 +103,7 @@ export default function LogsContent() {
           </div>
           <div>
             <h3 className="text-lg font-black text-gray-900">{logs.length} Total Aktivitas</h3>
-            <p className="text-xs text-gray-400">Menampilkan 10 riwayat log per halaman secara terpaginasi</p>
+            <p className="text-xs text-gray-400">Menampilkan 10 riwayat log per halaman</p>
           </div>
         </div>
 
