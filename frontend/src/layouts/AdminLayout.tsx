@@ -105,7 +105,20 @@ export default function AdminLayout({ role }: AdminLayoutProps) {
           })}
         </nav>
 
-        <div className="p-4 border-t border-gray-100 space-y-2">
+        <div className="p-4 border-t border-gray-100 space-y-3">
+          <div className="flex items-center gap-3 bg-[#F8F9FD] border border-gray-100 rounded-2xl p-3">
+            <div className="w-10 h-10 shrink-0 bg-gradient-to-tr from-[#6D28D9] to-[#8B5CF6] rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm shadow-purple-200">
+              {user?.name ? user.name[0].toUpperCase() : role.charAt(0)}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-gray-900 truncate leading-tight">
+                {user?.name || role}
+              </p>
+              <span className="inline-block mt-1 text-[10px] bg-purple-100 text-[#7C3AED] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                {role}
+              </span>
+            </div>
+          </div>
           <button
             type="button"
             onClick={handleLogout}
@@ -120,25 +133,6 @@ export default function AdminLayout({ role }: AdminLayoutProps) {
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-20 bg-white border-b border-gray-100 flex items-center px-8 justify-between sticky top-0 z-30 shadow-xs">
-          <div>
-            <h2 className="text-base font-bold text-gray-900 leading-tight">
-              {user ? `Halo, ${user.name}` : 'Halo, SuperAdmin'}
-            </h2>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Panel Pengelolaan Platform Tiket Konser
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs bg-purple-100 text-[#7C3AED] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-              {role}
-            </span>
-            <div className="w-10 h-10 bg-gradient-to-tr from-[#6D28D9] to-[#8B5CF6] rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm shadow-purple-200">
-              {user?.name ? user.name[0].toUpperCase() : 'S'}
-            </div>
-          </div>
-        </header>
-
         <main className="flex-1 overflow-y-auto p-8 animate-fade-in">
           <Outlet />
         </main>

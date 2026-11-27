@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom'
 
 export default function PembeliLayout() {
@@ -7,9 +7,48 @@ export default function PembeliLayout() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+  const userMenuRef = useRef<HTMLDivElement>(null)
 
   const userRaw = localStorage.getItem('user')
   const user = userRaw ? JSON.parse(userRaw) : null
+  const userInitial = user?.name ? String(user.name).charAt(0).toUpperCase() : ''
+
+  useEffect(() => {
+    const onScroll = () => {
+      setScrolled(window.scrollY > 40)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  useEffect(() => {
+    const onClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  useEffect(() => {
+    setShowUserMenu(false)
+    setMobileMenuOpen(false)
+  }, [location.pathname])
+
+  useEffect(() => {
+    if (location.pathname !== '/dashboard' || !location.hash) return
+    const id = location.hash.replace('#', '')
+    const timer = setTimeout(() => {
+      const el = document.getElementById(id)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' })
+      }
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [location.pathname, location.hash])
 
   const handleLogout = () => {
     localStorage.clear()
@@ -28,66 +67,88 @@ export default function PembeliLayout() {
     setMobileMenuOpen(false)
   }
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
+  const handleSearchSubmit = (e: FormEvent) => {
     e.preventDefault()
     if (location.pathname !== '/dashboard') {
       navigate('/dashboard')
     }
+    setMobileMenuOpen(false)
   }
+
+  const linkBase =
+    'px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 cursor-pointer whitespace-nowrap'
+  const linkIdle = 'text-gray-600 hover:text-[#7C3AED] hover:bg-purple-50'
+  const linkActive = 'text-[#7C3AED] bg-purple-100/80 font-bold'
 
   return (
     <div className="min-h-screen bg-white text-gray-800 flex flex-col font-sans">
-      <nav className="bg-white border-b border-gray-100 sticky top-0 z-50 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-20 items-center gap-4">
-            <div className="flex items-center gap-8">
-              <Link to="/dashboard" className="flex items-center gap-2.5 group">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#6D28D9] to-[#8B5CF6] flex items-center justify-center text-white shadow-sm shadow-purple-200">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M4 4a2 2 0 00-2 2v3.5a1.5 1.5 0 010 3V16a2 2 0 002 2h16a2 2 0 002-2v-3.5a1.5 1.5 0 010-3V6a2 2 0 00-2-2H4zm8 3a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1V8a1 1 0 011-1z" />
-                  </svg>
-                </div>
-                <span className="text-2xl font-black tracking-tight text-gray-900 group-hover:text-[#7C3AED] transition-colors">
-                  Concertify
-                </span>
-              </Link>
-
-              <div className="hidden md:flex items-center gap-7">
-                <Link
-                  to="/dashboard"
-                  className={`text-sm font-semibold transition-all py-1 ${
-                    location.pathname === '/dashboard' ? 'text-[#7C3AED] border-b-2 border-[#7C3AED] font-bold' : 'text-gray-600 hover:text-[#7C3AED]'
-                  }`}
-                >
-                  Beranda
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => handleNavClick('artis-populer')}
-                  className="text-sm font-semibold text-gray-600 hover:text-[#7C3AED] transition-colors cursor-pointer py-1"
-                >
-                  Artis
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleNavClick('konser-mendatang')}
-                  className="text-sm font-semibold text-gray-600 hover:text-[#7C3AED] transition-colors cursor-pointer py-1"
-                >
-                  Konser
-                </button>
-                <Link
-                  to="/my-tickets"
-                  className={`text-sm font-semibold transition-all py-1 ${
-                    location.pathname === '/my-tickets' ? 'text-[#7C3AED] border-b-2 border-[#7C3AED] font-bold' : 'text-gray-600 hover:text-[#7C3AED]'
-                  }`}
-                >
-                  Tiket Saya
-                </Link>
+      <header
+        className={`fixed top-0 inset-x-0 z-50 flex justify-center px-4 pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          scrolled ? 'pt-3' : 'pt-4'
+        }`}
+      >
+        <nav
+          className={`pointer-events-auto relative w-full transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            scrolled ? 'max-w-4xl' : 'max-w-7xl'
+          }`}
+        >
+          <div
+            className={`flex items-center justify-between gap-3 border backdrop-blur-xl rounded-[28px] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              scrolled
+                ? 'h-14 px-3 bg-white/85 border-purple-100 shadow-xl shadow-purple-300/30'
+                : 'h-[72px] px-5 bg-white/80 border-gray-100 shadow-sm'
+            }`}
+          >
+            <Link to="/dashboard" className="flex items-center gap-2.5 group shrink-0">
+              <div
+                className={`rounded-xl bg-gradient-to-tr from-[#6D28D9] to-[#8B5CF6] flex items-center justify-center text-white shadow-sm shadow-purple-200 transition-all duration-500 group-hover:rotate-6 ${
+                  scrolled ? 'w-8 h-8' : 'w-10 h-10'
+                }`}
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M4 4a2 2 0 00-2 2v3.5a1.5 1.5 0 010 3V16a2 2 0 002 2h16a2 2 0 002-2v-3.5a1.5 1.5 0 010-3V6a2 2 0 00-2-2H4zm8 3a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1V8a1 1 0 011-1z" />
+                </svg>
               </div>
+              <span
+                className={`font-black tracking-tight text-gray-900 group-hover:text-[#7C3AED] transition-all duration-500 ${
+                  scrolled ? 'text-lg' : 'text-2xl'
+                }`}
+              >
+                Concertify
+              </span>
+            </Link>
+
+            <div className="hidden lg:flex items-center gap-1">
+              <Link
+                to="/dashboard"
+                className={`${linkBase} ${location.pathname === '/dashboard' ? linkActive : linkIdle}`}
+              >
+                Beranda
+              </Link>
+              <button
+                type="button"
+                onClick={() => handleNavClick('artis-populer')}
+                className={`${linkBase} ${linkIdle}`}
+              >
+                Artis
+              </button>
+              <button
+                type="button"
+                onClick={() => handleNavClick('konser-mendatang')}
+                className={`${linkBase} ${linkIdle}`}
+              >
+                Konser
+              </button>
+              <Link
+                to="/my-tickets"
+                className={`${linkBase} ${location.pathname === '/my-tickets' ? linkActive : linkIdle}`}
+              >
+                Tiket Saya
+              </Link>
             </div>
 
-            <div className="flex items-center gap-3">
-              <form onSubmit={handleSearchSubmit} className="hidden sm:block relative">
+            <div className="flex items-center gap-2.5 shrink-0">
+              <form onSubmit={handleSearchSubmit} className="hidden lg:block">
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -99,51 +160,74 @@ export default function PembeliLayout() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Cari artis atau konser..."
-                    className="w-56 lg:w-72 pl-10 pr-4 py-2 text-xs lg:text-sm bg-[#F9FAFB] border border-gray-200 rounded-full focus:outline-hidden focus:border-[#7C3AED] focus:bg-white focus:ring-2 focus:ring-purple-100 transition-all text-gray-800 placeholder-gray-400"
+                    className={`pl-10 pr-4 text-sm bg-gray-50/80 border border-gray-200 rounded-full focus:outline-hidden focus:border-[#7C3AED] focus:bg-white focus:ring-2 focus:ring-purple-100 transition-all duration-500 text-gray-800 placeholder-gray-400 ${
+                      scrolled ? 'w-40 py-1.5 focus:w-52' : 'w-60 xl:w-72 py-2.5'
+                    }`}
                   />
                 </div>
               </form>
 
-              <div className="relative">
+              <div className="relative" ref={userMenuRef}>
                 <button
                   type="button"
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="w-10 h-10 rounded-full border border-gray-200 hover:border-[#7C3AED] flex items-center justify-center text-gray-600 hover:text-[#7C3AED] bg-gray-50 transition-colors cursor-pointer"
+                  className={`rounded-full flex items-center justify-center transition-all duration-500 cursor-pointer ${
+                    scrolled ? 'w-9 h-9' : 'w-11 h-11'
+                  } ${
+                    userInitial
+                      ? 'bg-gradient-to-tr from-[#6D28D9] to-[#8B5CF6] text-white font-bold text-sm shadow-md shadow-purple-200 hover:scale-105'
+                      : 'border border-gray-200 hover:border-[#7C3AED] text-gray-600 hover:text-[#7C3AED] bg-gray-50'
+                  }`}
                   aria-label="User Menu"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
+                  {userInitial ? (
+                    <span>{userInitial}</span>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  )}
                 </button>
 
-                {showUserMenu && (
-                  <div className="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 animate-fade-in">
-                    <div className="px-4 py-2.5 border-b border-gray-100">
-                      <p className="text-sm font-bold text-gray-900 truncate">{user?.name || 'Customer'}</p>
-                      <p className="text-xs text-gray-500 truncate">{user?.email || 'customer@concertify.com'}</p>
-                    </div>
-                    <Link
-                      to="/my-tickets"
-                      onClick={() => setShowUserMenu(false)}
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED] transition-colors"
-                    >
-                      Tiket Saya
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                    >
-                      Keluar
-                    </button>
+                <div
+                  className={`absolute right-0 top-full mt-3 w-60 bg-white rounded-2xl shadow-2xl shadow-purple-300/30 border border-gray-100 py-2 origin-top-right transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                    showUserMenu
+                      ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto'
+                      : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'
+                  }`}
+                >
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <p className="text-sm font-bold text-gray-900 truncate">{user?.name || 'Pengguna'}</p>
+                    {user?.email && <p className="text-xs text-gray-500 truncate mt-0.5">{user.email}</p>}
                   </div>
-                )}
+                  <Link
+                    to="/my-tickets"
+                    onClick={() => setShowUserMenu(false)}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED] transition-colors"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M4 4a2 2 0 00-2 2v3.5a1.5 1.5 0 010 3V16a2 2 0 002 2h16a2 2 0 002-2v-3.5a1.5 1.5 0 010-3V6a2 2 0 00-2-2H4z" />
+                    </svg>
+                    Tiket Saya
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Keluar
+                  </button>
+                </div>
               </div>
 
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 text-gray-600 hover:text-[#7C3AED] focus:outline-hidden"
+                className="lg:hidden w-10 h-10 rounded-full flex items-center justify-center text-gray-600 hover:text-[#7C3AED] hover:bg-purple-50 transition-colors focus:outline-hidden cursor-pointer"
+                aria-label="Menu"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={mobileMenuOpen ? 'M6 18L18 6M6 6l12 12' : 'M4 6h16M4 12h16M4 18h16'} />
@@ -152,49 +236,66 @@ export default function PembeliLayout() {
             </div>
           </div>
 
-          {mobileMenuOpen && (
-            <div className="md:hidden border-t border-gray-100 py-4 px-2 space-y-2">
+          <div
+            className={`lg:hidden absolute top-full inset-x-0 mt-3 bg-white/95 backdrop-blur-xl rounded-3xl border border-purple-100 shadow-2xl shadow-purple-300/30 p-4 origin-top transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              mobileMenuOpen
+                ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto'
+                : 'opacity-0 scale-95 -translate-y-3 pointer-events-none'
+            }`}
+          >
+            <form onSubmit={handleSearchSubmit} className="relative mb-3">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Cari artis atau konser..."
-                className="w-full px-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-full mb-3"
+                className="w-full pl-11 pr-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-full focus:outline-hidden focus:border-[#7C3AED] focus:bg-white focus:ring-2 focus:ring-purple-100 transition-all"
               />
+            </form>
+            <div className="space-y-1">
               <Link
                 to="/dashboard"
                 onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED]"
+                className={`block px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                  location.pathname === '/dashboard' ? 'bg-purple-100/80 text-[#7C3AED]' : 'text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED]'
+                }`}
               >
                 Beranda
               </Link>
               <button
                 type="button"
                 onClick={() => handleNavClick('artis-populer')}
-                className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED]"
+                className="w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED] transition-colors cursor-pointer"
               >
                 Artis
               </button>
               <button
                 type="button"
                 onClick={() => handleNavClick('konser-mendatang')}
-                className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED]"
+                className="w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED] transition-colors cursor-pointer"
               >
                 Konser
               </button>
               <Link
                 to="/my-tickets"
                 onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED]"
+                className={`block px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                  location.pathname === '/my-tickets' ? 'bg-purple-100/80 text-[#7C3AED]' : 'text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED]'
+                }`}
               >
                 Tiket Saya
               </Link>
             </div>
-          )}
-        </div>
-      </nav>
+          </div>
+        </nav>
+      </header>
 
-      <main className="flex-1 animate-fade-in">
+      <main className="flex-1 pt-24 sm:pt-28 animate-fade-in">
         <Outlet context={{ searchQuery, setSearchQuery }} />
       </main>
 
